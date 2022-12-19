@@ -543,6 +543,13 @@ class ALU_rr<bits<7> funct7, bits<3> funct3, string opcodestr,
               opcodestr, "$rd, $rs1, $rs2"> {
   let isCommutable = Commutable;
 }
+class ALU_rr_T<bits<7> funct7, bits<3> funct3, string opcodestr,
+             bit Commutable = 0>
+    : RVInstR<funct7, funct3, OPC_OP, (outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2, GPR:$rs3),
+              opcodestr, "$rd, $rs1, $rs2, $rs3"> {
+  let isCommutable = Commutable;
+}
+
 
 let hasNoSchedulingInfo = 1,
     hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
@@ -643,7 +650,9 @@ def SLLI : Shift_ri<0b00000, 0b001, "slli">;
 def SRLI : Shift_ri<0b00000, 0b101, "srli">;
 def SRAI : Shift_ri<0b01000, 0b101, "srai">;
 
-def ADD  : ALU_rr<0b0000000, 0b000, "add", /*Commutable*/1>,
+def ADD  : ALU_rr<0b0000000, 0b000, "add222", /*Commutable*/1>,
+           Sched<[WriteIALU, ReadIALU, ReadIALU]>;
+def ADD_T  : ALU_rr_T<0b0001000, 0b000, "add_t", /*Commutable*/1>,
            Sched<[WriteIALU, ReadIALU, ReadIALU]>;
 def SUB  : ALU_rr<0b0100000, 0b000, "sub">,
            Sched<[WriteIALU, ReadIALU, ReadIALU]>;
@@ -1011,6 +1020,8 @@ def : InstAlias<"sw $rs2, (${rs1})",
 
 def : InstAlias<"add $rd, $rs1, $imm12",
                 (ADDI  GPR:$rd, GPR:$rs1, simm12:$imm12)>;
+// def : InstAlias<"add_t $rd, $rs1, $imm12",
+//                 (ADD_T  GPR:$rd, GPR:$rs1, simm12:$imm12)>;
 def : InstAlias<"and $rd, $rs1, $imm12",
                 (ANDI  GPR:$rd, GPR:$rs1, simm12:$imm12)>;
 def : InstAlias<"xor $rd, $rs1, $imm12",
@@ -1154,7 +1165,8 @@ class PatGpr<SDPatternOperator OpNode, RVInst Inst>
     : Pat<(OpNode GPR:$rs1), (Inst GPR:$rs1)>;
 class PatGprGpr<SDPatternOperator OpNode, RVInst Inst>
     : Pat<(OpNode GPR:$rs1, GPR:$rs2), (Inst GPR:$rs1, GPR:$rs2)>;
-
+class PatGprGpr_T<SDPatternOperator OpNode, RVInst Inst>
+    : Pat<(OpNode GPR:$rs1,(OpNode GPR:$rs2, GPR:$rs3)), (Inst GPR:$rs1,GPR:$rs2,GPR:$rs3)>;
 class PatGprImm<SDPatternOperator OpNode, RVInst Inst, ImmLeaf ImmType>
     : Pat<(XLenVT (OpNode (XLenVT GPR:$rs1), ImmType:$imm)),
           (Inst GPR:$rs1, ImmType:$imm)>;
@@ -1205,6 +1217,10 @@ def fpext_oneuse  : unop_oneuse<any_fpextend>;
 /// Simple arithmetic operations
 
 def : PatGprGpr<add, ADD>;
+// Defines the pattern
+def : PatGprGpr_T<add, ADD_T>;
+// class PatGprGpr<SDPatternOperator OpNode, RVInst Inst>
+//     : Pat<(OpNode GPR:$rs1, GPR:$rs2), (Inst GPR:$rs1, GPR:$rs2)>;
 def : PatGprSimm12<add, ADDI>;
 def : PatGprGpr<sub, SUB>;
 def : PatGprGpr<or, OR>;
